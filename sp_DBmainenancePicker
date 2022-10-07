@@ -1,0 +1,62 @@
+USE [_DBAUtility]
+GO
+/****** Object:  StoredProcedure [dbo].[sp_DBmaintenancePicker]    Script Date: 10/6/2022 1:24:08 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[sp_DBmaintenancePicker] 
+@cycle nvarchar(30)= NULL,
+@overridedate date = NULL
+AS
+
+BEGIN
+DECLARE @TodayAsInt tinyint
+Declare @Modsize tinyint
+if(@overridedate IS NULL or @overridedate = ' ')
+begin
+	set @overridedate  = getdate()
+end
+--uncomment and manipulate to simulate a different day
+--set @overridedate ='2/19/2023'
+
+if(@cycle IS NULL or @cycle = ' ' or @cycle = 'monthly')
+Begin
+
+--get number of days in current month
+Set @Modsize = DAY(EOMONTH(@overridedate))
+
+--get todays int value
+set @TodayAsInt = day(@overridedate)
+end
+if (@cycle = 'weekly')
+begin
+set @TodayAsInt = DATEPART(WEEKDAY, @overridedate)
+set @Modsize = 7
+END
+
+select
+string_agg(
+--maintenancetable.maintenanceday,
+--maintenancetable.num_row,
+''''+maintenancetable.dbname+'''',
+',') as csv
+from(
+	 SELECT 
+	 ROW_NUMBER() over(ORDER BY (SUM(CAST(mf.size AS bigint)) * 8 / 1024)  desc,d.name) as num_row,
+	 d.NAME as dbname,
+	 SUM(CAST(mf.size AS bigint)) * 8 / 1024 as Size_MB,
+	  (ROW_NUMBER() over(ORDER BY (SUM(CAST(mf.size AS bigint)) * 8 / 1024)  desc,d.name)%@Modsize)+1 as maintenanceday
+
+	FROM sys.master_files mf
+	INNER JOIN sys.databases d ON d.database_id = mf.database_id
+	WHERE d.database_id > 4 -- Skip system databases
+	group by d.name
+	--ORDER BY num_row
+) maintenancetable
+where maintenanceday = @TodayAsInt
+
+
+
+END
