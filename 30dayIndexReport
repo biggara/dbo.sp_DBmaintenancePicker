@@ -1,0 +1,8 @@
+SELECT DATEADD(day, DATEDIFF(day, 0, starttime), 0) AS Day,
+COUNT(*) AS Count,
+Min(starttime) as firstStartTime,
+MAX(endtime) AS [LatestEndtime]
+FROM [_DBAUtility].[dbo].[CommandLog]
+WHERE starttime >= DATEADD(day, -30, GETDATE()) and CommandType = 'ALTER_INDEX'
+GROUP BY DATEADD(day, DATEDIFF(day, 0, starttime), 0)
+ORDER BY Day desc;
